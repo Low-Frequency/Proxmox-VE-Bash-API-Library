@@ -34,7 +34,7 @@ The library is configured via environment variables, or a config file. The follo
 | PROXMOX_VE_INSECURE_TLS | Enables insecure communication for self signed certificates | no | 0 |
 | PROXMOX_VE_ENDPOINT | The endpoint URL for communication with the Proxmox node. Has to be in the form of [protocol]://[IP\|FQDN]:[port] | yes | |
 | PROXMOX_VE_USERNAME | Username for authenticating. Has to be in the form of [username]@[realm] | yes | |
-| PROXMOX_VE_PASSWORD | Password for authenticationg | yes | |
+| PROXMOX_VE_PASSWORD | Password for authenticating | yes | |
 | PROXMOX_VE_TOTP_SECRET | TOTP secret for MFA calculation | only if TOTP is enabled for the user | |
 
 The library preferes environment variables over the config file, so if you set a config option in both the environment and the file, it will use the environment variable. A mixed configuration is also possible, for example you can configure all secrets as environment variables, but the user and endpoint remain in the config file. Defaults have the least priority and only get set if not otherwise specified.
