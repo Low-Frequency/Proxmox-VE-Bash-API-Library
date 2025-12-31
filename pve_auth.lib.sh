@@ -31,8 +31,8 @@
 #!
 #!
 #!  Public API:
-#!    pve_init [config_file] [reinit]
-#!    pve_calc_totp
+#!    pve_init [OPTIONS] [config_file]
+#!      --reinit
 #!    pve_auth
 #!    pve_get_ticket
 #!    pve_get_csrf_token
@@ -136,8 +136,28 @@ pve_set_defaults() {
 
 # Initialize config
 pve_init() {
-  local config_file="${1:-}"
-  local reinit="${2:-0}"
+  local config_file=""
+  local reinit=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --reinit)
+        reinit=1
+        ;;
+      -*)
+        pve_auth_err "Unknown option: ${1}"
+        return 1
+        ;;
+      *)
+        if [[ -n "${config_file}" ]]; then
+          pve_auth_err "Multiple config files specified"
+          return 1
+        fi
+        config_file="${1}"
+        ;;
+    esac
+    shift
+  done
 
   # Add possibility to clear configuration and reinitialize afterwards
   if [[ ${reinit} -eq 1 ]]; then

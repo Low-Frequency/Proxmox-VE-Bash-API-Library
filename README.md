@@ -50,12 +50,12 @@ source pve_auth.lib.sh
 ### Initialize configuration
 
 ```bash
-pve_init [config_file] [reinit]
+pve_init [OPTIONS] [config_file]
 ```
 
 Config file is only needed if the environment variables are not set.
 
-You can set the `reinit` parameter to `1` to force a configuration change, for example if you wanted to switch endpoints, or use a different user. Omit this parameter otherwise.
+`--reinit` option can be used to reload the configuration after changes have been made to either the config file, or environment variables.
 
 ### TOTP calculation
 
