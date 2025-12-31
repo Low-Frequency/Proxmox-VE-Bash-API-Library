@@ -29,6 +29,16 @@
 #!  PROXMOX_VE_TOTP_SECRET="BASE32SECRET"
 #!  PROXMOX_VE_INSECURE_TLS=0
 #!
+#!  Default config file:
+#!    ~/.config/pve-auth.conf
+#!    (only loaded if it exists and no explicit config is provided)
+#!
+#!  Configuration precedence (lowest -> highest):
+#!    1. Built-in defaults
+#!    2. Default config file (~/.config/pve-auth.conf)
+#!    3. Explicit config file (pve_init <file>)
+#!    4. Environment variables
+#!
 #!
 #!  Public API:
 #!    pve_init [OPTIONS] [config_file]
@@ -43,6 +53,9 @@ if [[ -n "${_PROXMOX_AUTH_LIB_LOADED:-}" ]]; then
 fi
 
 readonly _PROXMOX_AUTH_LIB_LOADED=1
+
+# Default config path
+readonly _PVE_DEFAULT_CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/pve-auth.conf"
 
 # Dependencies and options
 readonly _pve_curl_opts=(--disable --silent --show-error --fail)
@@ -174,9 +187,21 @@ pve_init() {
     return 0
   fi
 
+  # Reset Authentication and set defaults
   pve_reset_auth
   pve_set_defaults
-  pve_load_config_file "${config_file}"
+
+  # Load default config
+  if [[ -f "${_PVE_DEFAULT_CONFIG_FILE}" ]]; then
+    pve_load_config_file "${_PVE_DEFAULT_CONFIG_FILE}" || return 1
+  fi
+
+  # Load explicit override config
+  if [[ -n "${config_file}" ]]; then
+    pve_load_config_file "${config_file}" || return 1
+  fi
+
+  # Load Environment overrides
   pve_load_env
 
   # Validation

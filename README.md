@@ -53,9 +53,9 @@ source pve_auth.lib.sh
 pve_init [OPTIONS] [config_file]
 ```
 
-Config file is only needed if the environment variables are not set.
+You can place a default configuration in `~/.config/pve-auth.conf`. If this file exists, it will always be loaded, but an explicit config file passed to the command will override it. This way you can set defaults in the default config, override settings in an override config file and still load secrets from environment variables. The explicit config file is only needed if the default config or environment variables don't contain all necessary variables.
 
-`--reinit` option can be used to reload the configuration after changes have been made to either the config file, or environment variables.
+`--reinit` option can be used to reload the configuration after changes have been made to either the config files, or environment variables.
 
 ### TOTP calculation
 
