@@ -45,7 +45,6 @@ The following tools must be available in `$PATH`:
 Clone or copy the library files somewhere on your system:
 
 ```bash
-pve-auth.lib.sh
 pve-api.lib.sh
 ```
 
