@@ -1,84 +1,204 @@
-# PVE-authentication-library
+# Proxmox VE Bash API Library
 
-This bash library provides a simple workflow for requesting authentication tickets from a proxmox node.
+A small, dependency-light Bash library for authenticating against and interacting with the **Proxmox VE API**.
 
-It started as a simple script to authenticate the [bpg/proxmox](https://github.com/bpg/terraform-provider-proxmox) Terraform provider inside a CI/CD pipeline and quickly evolved to a full bash library. The library currently only supports user/password authentication with optional TOTP, but might be expanded with API token support and a simple API wrapper in the future.
+This library provides:
 
-The workflow with this library is split into four steps:
+- Configuration handling (config file + environment overrides)
+- Authentication via:
+  - API tokens
+  - Username/password (+ optional TOTP)
+- Automatic authentication method selection per API endpoint
+- A single, predictable API request interface
 
-1. Initializing configuration
-2. Calculating TOTP
-3. Authenticating
-4. Getting the authentication ticket and CSRF prevention token
+It is designed to be **simple, explicit, and safe**, without trying to abstract the Proxmox API itself.
 
-Calculating TOTP is only necessary for the initial TOTP setup. If TOTP is already set up, you can pass the TOTP secret via the respective environment variable, or set it in the configuration file and the library will automatically calculate a TOTP token if needed.
+---
 
-## Dependencies
+## Features
 
-This library depends on the following commands:
+- ✔ Supports **API tokens** and **ticket-based authentication**
+- ✔ Automatic fallback: token → ticket (when applicable)
+- ✔ Handles **TOTP / 2FA**
+- ✔ Minimal auth classification rules (default-to-token policy)
+- ✔ Uses `curl --get` for GET query parameters
+- ✔ No background state, no daemons, no magic
+- ✔ Works with self-signed certificates
 
-| Command | Provided by |
-|---------|-------------|
-| `curl` | curl |
-| `jq` | jq |
-| `xxd` | vim-common |
-| `base32` | coreutils |
-| `openssl` | openssl |
+---
+
+## Requirements
+
+The following tools must be available in `$PATH`:
+
+- `bash`
+- `curl`
+- `jq`
+- `openssl`
+- `base32`
+- `xxd`
+
+---
+
+## Installation
+
+Clone or copy the library files somewhere on your system:
+
+```bash
+pve-auth.lib.sh
+pve-api.lib.sh
+```
+
+Then source them in your script:
+
+```bash
+source ./pve-api.lib.sh
+```
+
+---
 
 ## Configuration
 
-The library is configured via environment variables, or a config file. The following variables can be set:
+Configuration can be provided via:
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| PROXMOX_VE_INSECURE_TLS | Enables insecure communication for self signed certificates | no | 0 |
-| PROXMOX_VE_ENDPOINT | The endpoint URL for communication with the Proxmox node. Has to be in the form of [protocol]://[IP\|FQDN]:[port] | yes | |
-| PROXMOX_VE_USERNAME | Username for authenticating. Has to be in the form of [username]@[realm] | yes | |
-| PROXMOX_VE_PASSWORD | Password for authenticating | yes | |
-| PROXMOX_VE_TOTP_SECRET | TOTP secret for MFA calculation | only if TOTP is enabled for the user | |
+1. Built-in defaults
+2. Default config file: `~/.config/pve-auth.conf`
+3. Explicit config file passed to `pve_init`
+4. Environment variables (highest priority)
 
-The library preferes environment variables over the config file, so if you set a config option in both the environment and the file, it will use the environment variable. A mixed configuration is also possible, for example you can configure all secrets as environment variables, but the user and endpoint remain in the config file. Defaults have the least priority and only get set if not otherwise specified.
-
-## Usage
-
-### Loading the library
-
+Config file example
 ```bash
-source pve_auth.lib.sh
+PROXMOX_VE_ENDPOINT="https://pve.example.com:8006"
+PROXMOX_VE_USERNAME="root@pam"
+PROXMOX_VE_PASSWORD="secret"
+PROXMOX_VE_TOTP_SECRET="BASE32SECRET"
+PROXMOX_VE_API_TOKEN_ID="root@pam!monitoring"
+PROXMOX_VE_API_TOKEN_SECRET="aaaa-bbbb-cccc-dddd"
+PROXMOX_VE_INSECURE_TLS=0
 ```
 
-### Initialize configuration
+### Environment variables
+
+| Variable                      | Description                                        |
+| ----------------------------- | -------------------------------------------------- |
+| `PROXMOX_VE_ENDPOINT`         | Proxmox API endpoint (including protocol and port) |
+| `PROXMOX_VE_USERNAME`         | Username (`user@realm`)                            |
+| `PROXMOX_VE_PASSWORD`         | Password                                           |
+| `PROXMOX_VE_TOTP_SECRET`      | Base32-encoded TOTP secret (optional)              |
+| `PROXMOX_VE_API_TOKEN_ID`     | API token ID                                       |
+| `PROXMOX_VE_API_TOKEN_SECRET` | API token secret                                   |
+| `PROXMOX_VE_INSECURE_TLS`     | Set to `1` to allow self-signed TLS                |
+
+---
+
+## Initialization
+
+Before using the library, initialize it:
 
 ```bash
-pve_init [OPTIONS] [config_file]
+pve_init
 ```
 
-You can place a default configuration in `~/.config/pve-auth.conf`. If this file exists, it will always be loaded, but an explicit config file passed to the command will override it. This way you can set defaults in the default config, override settings in an override config file and still load secrets from environment variables. The explicit config file is only needed if the default config or environment variables don't contain all necessary variables.
-
-`--reinit` option can be used to reload the configuration after changes have been made to either the config files, or environment variables.
-
-### TOTP calculation
-
-Only necessary for initial TOTP setup.
+With an explicit config file:
 
 ```bash
-pve_calc_totp "${PROXMOX_VE_TOTP_SECRET}"
+pve_init /path/to/config.conf
 ```
 
-### Authentication
+Force reinitialization:
+
+```bash
+pve_init --reinit
+```
+
+---
+
+## Authentication
+
+Authenticate using available credentials:
 
 ```bash
 pve_auth
 ```
 
-### Getting the authentication ticket
+Check authentication status:
 
 ```bash
-export PROXMOX_VE_AUTH_TICKET=$(pve_get_ticket)
+pve_auth --status
 ```
 
-### Getting the CSRF prevention token
+The library automatically determines whether API token authentication, ticket authentication, or no authentication is required for each request.
+
+---
+
+## Making API requests
+
+Basic usage
 
 ```bash
-export PROXMOX_VE_CSRF_PREVENTION_TOKEN=$(pve_get_csrf_token)
+pve_api_request \
+  --method GET \
+  --path nodes
 ```
+
+The --path value is relative to /api2/json.
+
+---
+
+### GET requests with query parameters
+
+```bash
+pve_api_request \
+  --method GET \
+  --path nodes/pve/lxc \
+  --data "type=container"
+```
+
+Query parameters are automatically encoded and appended using curl --get.
+
+---
+
+### POST / PUT / DELETE requests
+
+```bash
+pve_api_request \
+  --method POST \
+  --path nodes/pve/lxc \
+  --data "vmid=101" \
+  --data "ostemplate=local:vztmpl/debian.tar.gz"
+```
+
+Use:
+
+`--data` for raw request body
+
+`--data-urlencode` for URL-encoded key/value pairs
+
+---
+
+## Authentication Classification
+
+The library automatically selects the appropriate authentication method per endpoint.
+
+Only a small number of known edge cases are explicitly classified (e.g. login, ticket creation, TFA endpoints).
+All other endpoints default to API token authentication, with automatic fallback to ticket auth when needed.
+
+This keeps the ruleset minimal, explicit, and future-proof.
+
+---
+
+## Error Handling
+
+HTTP errors are handled via curl `--fail`
+
+API-level errors are detected via the `.errors` field in responses
+
+Errors are printed to `stderr`
+
+Functions return non-zero exit codes on failure
+
+---
+
+## Disclaimer
+
+This is a hobby project. I won't provide support if you break anything by using this library. Use at your own risk.
